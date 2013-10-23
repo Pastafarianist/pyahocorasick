@@ -24,13 +24,6 @@ typedef enum {
 } AutomatonKind;
 
 
-typedef enum {
-	STORE_INTS,
-	STORE_LENGTH,
-	STORE_ANY
-} KeysStore;
-
-
 typedef struct AutomatonStatistics {
 	int		version;
 
@@ -47,7 +40,6 @@ typedef struct Automaton {
 	PyObject_HEAD
 
 	AutomatonKind	kind;	///< current kind of automaton
-	KeysStore		store;	///< type of values: copy of string, bare integer, python  object
 	int				count;	///< number of distinct words
 	int				longest_word;	///< length of the longest word
 	TrieNode*		root;	///< root of a trie

@@ -18,10 +18,8 @@
 
 /* links to children nodes are stored in dynamic table */
 typedef struct TrieNode {
-	union {
-		PyObject*	object;		///< valid when kind = STORE_ANY
-		int			integer;	///< valid when kind in [STORE_LENGTH, STORE_INTS]
-	} output; ///< output function, valid when eow is true
+	PyObject*			value;	///< output value
+
 	struct TrieNode*	fail;	///< fail node
 
 #if TRIE_LETTER_SIZE == 1

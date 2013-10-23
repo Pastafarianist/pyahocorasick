@@ -1,6 +1,6 @@
 /*
 	This is part of pyahocorasick Python module.
-	
+
 	Automaton class implementation.
 	(this file includes Automaton_pickle.c)
 
@@ -18,24 +18,6 @@ static PyTypeObject automaton_type;
 
 
 static bool ALWAYS_INLINE
-check_store(const int store) {
-	switch (store) {
-		case STORE_LENGTH:
-		case STORE_INTS:
-		case STORE_ANY:
-			return true;
-
-		default:
-			PyErr_SetString(
-				PyExc_ValueError,
-				"store must have value STORE_LENGTH, STORE_INTS or STORE_ANY"
-			);
-			return false;
-	} // switch
-}
-
-
-static bool ALWAYS_INLINE
 check_kind(const int kind) {
 	switch (kind) {
 		case EMPTY:
@@ -46,7 +28,7 @@ check_kind(const int kind) {
 		default:
 			PyErr_SetString(
 				PyExc_ValueError,
-				"store must have value EMPTY, TRIE or AHOCORASICK"
+				"kind must have value EMPTY, TRIE or AHOCORASICK"
 			);
 			return false;
 	}
@@ -56,7 +38,6 @@ check_kind(const int kind) {
 static PyObject*
 automaton_new(PyTypeObject* self, PyObject* args, PyObject* kwargs) {
 	Automaton* automaton = NULL;
-	int store;
 
 	automaton = (Automaton*)PyObject_New(Automaton, &automaton_type);
 	if (UNLIKELY(automaton == NULL))
@@ -71,29 +52,27 @@ automaton_new(PyTypeObject* self, PyObject* args, PyObject* kwargs) {
 	automaton->root  = NULL;
 
 	if (UNLIKELY(PyTuple_Size(args) == 7)) {
-		
-		// unpickle: count, data, kind, store, version, values
+
+		// unpickle: count, data, kind, version, values
 		size_t			count;
 		void*			data;
 		size_t			size;
 		int				version;
 		int				longest_word;
 		AutomatonKind	kind;
-		KeysStore		store;
 		PyObject*		values = NULL;
 
-		if (not PyArg_ParseTuple(args, "iy#iiiiO", &count, &data, &size, &kind, &store, &version, &longest_word, &values)) {
+		if (not PyArg_ParseTuple(args, "iy#iiiO", &count, &data, &size, &kind, &version, &longest_word, &values)) {
 			PyErr_SetString(PyExc_ValueError, "invalid data to restore");
 			goto error;
 		}
 
-		if (not check_store(store) or not check_kind(kind))
+		if (not check_kind(kind))
 			goto error;
 
 		if (kind != EMPTY) {
 			if (automaton_unpickle(automaton, count, data, size, values)) {
 				automaton->kind		= kind;
-				automaton->store	= store;
 				automaton->version	= version;
 				automaton->longest_word	= longest_word;
 			}
@@ -102,19 +81,6 @@ automaton_new(PyTypeObject* self, PyObject* args, PyObject* kwargs) {
 		}
 
 		Py_DECREF(values);
-	}
-	else {
-		// construct new object
-		if (PyArg_ParseTuple(args, "i", &store)) {
-			if (not check_store(store))
-				goto error;
-		}
-		else {
-			PyErr_Clear();
-			store = STORE_ANY;
-		}
-
-		automaton->store = store;
 	}
 
 //ok:
@@ -158,48 +124,15 @@ automaton_add_word(PyObject* self, PyObject* args) {
 
 	TRIE_LETTER_TYPE* word = NULL;
 	ssize_t wordlen = 0;
-	int integer = 0;
 
 	py_word = pymod_get_string_from_tuple(args, 0, &word, &wordlen);
 	if (not py_word)
 		return NULL;
 
-	switch (automaton->store) {
-		case STORE_ANY:
-			py_value = PyTuple_GetItem(args, 1);
-			if (not py_value) {
-				PyErr_SetString(PyExc_ValueError, "second argument required");
-				return NULL;
-			}
-			break;
-
-		case STORE_INTS:
-			py_value = PyTuple_GetItem(args, 1);
-			if (py_value) {
-				if (PyNumber_Check(py_value)) {
-					integer = (int)PyNumber_AsSsize_t(py_value, PyExc_ValueError);
-					if (integer == -1 and PyErr_Occurred())
-						return NULL;
-				}
-				else {
-					PyErr_SetString(PyExc_TypeError, "number required");
-					return NULL;
-				}
-			}
-			else {
-				// default
-				PyErr_Clear();
-				integer = automaton->count + 1;
-			}
-			break;
-
-		case STORE_LENGTH:
-			integer = wordlen;
-			break;
-
-		default:
-			PyErr_SetString(PyExc_SystemError, "invalid store value");
-			return NULL;
+	py_value = PyTuple_GetItem(args, 1);
+	if (not py_value) {
+		PyErr_SetString(PyExc_ValueError, "second argument required");
+		return NULL;
 	}
 
 	if (wordlen > 0) {
@@ -209,25 +142,18 @@ automaton_add_word(PyObject* self, PyObject* args) {
 
 		Py_DECREF(py_word);
 		if (node) {
-			switch (automaton->store) {
-				case STORE_ANY:
-					if (not new_word and node->eow)
-						// replace
-						Py_DECREF(node->output.object);
-				
-					Py_INCREF(py_value);
-					node->output.object = py_value;
-					break;
+			if (not new_word and node->eow)
+				// replace
+				Py_DECREF(node->value);
 
-				default:
-					node->output.integer = integer;
-			} // switch
+			Py_INCREF(py_value);
+			node->value = py_value;
 
 			if (new_word) {
 				automaton->version += 1; // change version only when new word appeared
 				if (wordlen > automaton->longest_word)
 					automaton->longest_word = wordlen;
-					
+
 				Py_RETURN_TRUE;
 			}
 			else {
@@ -244,26 +170,17 @@ automaton_add_word(PyObject* self, PyObject* args) {
 
 
 static void
-clear_aux(TrieNode* node, KeysStore store) {
+clear_aux(TrieNode* node) {
 	if (node) {
-		switch (store) {
-			case STORE_INTS:
-			case STORE_LENGTH:
-				// nop
-				break;
-
-			case STORE_ANY:
-				if (node->output.object)
-					Py_DECREF(node->output.object);
-				break;
-		}
+		if (node->value)
+			Py_DECREF(node->value);
 
 		const int n = node->n;
 		int i;
 		for (i=0; i < n; i++) {
 			TrieNode* child = node->next[i];
 			if (child != node) // avoid self-loops!
-				clear_aux(child, store);
+				clear_aux(child);
 		}
 
 		memfree(node);
@@ -279,7 +196,7 @@ clear_aux(TrieNode* node, KeysStore store) {
 static PyObject*
 automaton_clear(PyObject* self, PyObject* args) {
 #define automaton ((Automaton*)self)
-	clear_aux(automaton->root, automaton->store);
+	clear_aux(automaton->root);
 	automaton->count = 0;
 	automaton->longest_word = 0;
 	automaton->kind = EMPTY;
@@ -401,31 +318,19 @@ automaton_get(PyObject* self, PyObject* args) {
 	TrieNode* node = trie_find(automaton->root, word, wordlen);
 
 	if (node and node->eow) {
-		switch (automaton->store) {
-			case STORE_INTS:
-			case STORE_LENGTH:
-				return Py_BuildValue("i", node->output.integer);
+		Py_INCREF(node->value);
+		return node->value;
+	}
 
-			case STORE_ANY:
-				Py_INCREF(node->output.object);
-				return node->output.object;
-
-			default:
-				PyErr_SetNone(PyExc_ValueError);
-				return NULL;
-		}
+	py_def = PyTuple_GetItem(args, 1);
+	if (py_def) {
+		Py_INCREF(py_def);
+		return py_def;
 	}
 	else {
-		py_def = PyTuple_GetItem(args, 1);
-		if (py_def) {
-			Py_INCREF(py_def);
-			return py_def;
-		}
-		else {
-			PyErr_Clear();
-			PyErr_SetNone(PyExc_KeyError);
-			return NULL;
-		}
+		PyErr_Clear();
+		PyErr_SetNone(PyExc_KeyError);
+		return NULL;
 	}
 #undef automaton
 }
@@ -510,7 +415,7 @@ automaton_make_automaton(PyObject* self, PyObject* args) {
 			child->fail = trienode_get_next(state, child->letter);
 			if (child->fail == NULL)
 				child->fail = automaton->root;
-			
+
 			ASSERT(child->fail);
 		}
 	}
@@ -574,11 +479,7 @@ automaton_find_all(PyObject* self, PyObject* args) {
 
 		// return output
 		while (tmp and tmp->eow) {
-			if (automaton->store == STORE_ANY)
-				callback_ret = PyObject_CallFunction(callback, "iO", i, tmp->output.object);
-			else
-				callback_ret = PyObject_CallFunction(callback, "ii", i, tmp->output.integer);
-
+			callback_ret = PyObject_CallFunction(callback, "iO", i, tmp->value);
 			if (callback_ret == NULL)
 				return NULL;
 			else
@@ -607,11 +508,11 @@ automaton_items_create(PyObject* self, PyObject* args, const ItemsType type) {
 	PatternMatchType matchtype = MATCH_AT_LEAST_PREFIX;
 
 	// arg 1: prefix/prefix pattern
-	if (args) 
+	if (args)
 		arg1 = PyTuple_GetItem(args, 0);
 	else
 		arg1 = NULL;
-	
+
 	if (arg1) {
 		arg1 = pymod_get_string(arg1, &word, &wordlen);
 		if (arg1 == NULL)
@@ -687,7 +588,7 @@ automaton_items_create(PyObject* self, PyObject* args, const ItemsType type) {
 	}
 
 
-	// 
+	//
 	AutomatonItemsIter* iter = (AutomatonItemsIter*)automaton_items_iter_new(
 									automaton,
 									word,
@@ -827,7 +728,7 @@ get_stats(Automaton* automaton) {
 
 	if (automaton->kind != EMPTY)
 		get_stats_aux(automaton->root, &automaton->stats, 0);
-	
+
 	automaton->stats.version		= automaton->version;
 }
 
@@ -840,7 +741,7 @@ automaton_get_stats(PyObject* self, PyObject* args) {
 #define automaton ((Automaton*)self)
 	if (automaton->stats.version != automaton->version)
 		get_stats(automaton);
-	
+
 	PyObject* dict = Py_BuildValue(
 		"{s:i,s:i,s:i,s:i,s:i,s:i}",
 #define emit(name) #name, automaton->stats.name
@@ -880,8 +781,8 @@ dump_aux(TrieNode* node, const int depth, void* extra) {
 		Dump->error = 1; \
 		return 0; \
 	}
-		
-	
+
+
 	// 1.
 	tuple = Py_BuildValue("ii", node, (int)(node->eow));
 	append_tuple(Dump->nodes)
@@ -914,7 +815,7 @@ automaton_dump(PyObject* self, PyObject* args) {
 #define automaton ((Automaton*)self)
 	if (automaton->kind == EMPTY)
 		Py_RETURN_NONE;
-	
+
 	DumpAux dump;
 	dump.nodes = 0;
 	dump.edges = 0;
@@ -983,14 +884,6 @@ PyMemberDef automaton_members[] = {
 		offsetof(Automaton, kind),
 		READONLY,
 		"current kind of automaton"
-	},
-
-	{
-		"store",
-		T_INT,
-		offsetof(Automaton, store),
-		READONLY,
-		"type of values (ahocorasick.STORE_ANY/STORE_INTS/STORE_LEN)"
 	},
 
 	{NULL}

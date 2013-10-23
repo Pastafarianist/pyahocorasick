@@ -106,7 +106,7 @@ typedef struct PickleData {
 	size_t	top;		///< first free address
 	void*	data;		///< array
 
-	PyObject* values;	///< a list (if store == STORE_ANY)
+	PyObject* values;	///< a list
 	bool	error;		///< error occured during pickling
 } PickleData;
 
@@ -124,7 +124,7 @@ pickle_dump_save(TrieNode* node, const int depth, void* extra) {
 
 	// append python object to the list
 	if (node->eow and self->values) {
-		if (PyList_Append(self->values, node->output.object) == -1) {
+		if (PyList_Append(self->values, node->value) == -1) {
 			self->error = true;
 			return 0;
 		}
@@ -132,9 +132,9 @@ pickle_dump_save(TrieNode* node, const int depth, void* extra) {
 
 	// save node data
 	if (self->values)
-		dump->output.integer = 0;
+		dump->value = NULL;
 	else
-		dump->output.integer = NODEID(node)->id;	// save number
+		dump->value = (PyObject*) NODEID(node)->id;	// save number
 
 	dump->n		= node->n;
 	dump->eow	= node->eow;
@@ -197,11 +197,9 @@ automaton___reduce__(PyObject* self, PyObject* args) {
 		goto exception;
 	}
 
-	if (automaton->store == STORE_ANY) {
-		data.values = PyList_New(0);
-		if (not data.values)
-			goto exception;
-	}
+	data.values = PyList_New(0);
+	if (not data.values)
+		goto exception;
 
 	trie_traverse(automaton->root, pickle_dump_save, &data);
 	if (data.error)
@@ -211,18 +209,16 @@ automaton___reduce__(PyObject* self, PyObject* args) {
 		* count
 		* binary data
 		* automaton->kind
-		* automaton->store
 		* automaton->version
 		* automaton->longest_word
 		* list of values
 	*/
 
-	PyObject* tuple = Py_BuildValue("O(iy#iiiiO)",
+	PyObject* tuple = Py_BuildValue("O(iy#iiiO)",
 		Py_TYPE(self),
 		state.id,
 		data.data, data.top,
 		automaton->kind,
-		automaton->store,
 		automaton->version,
 		automaton->longest_word,
 		data.values
@@ -289,7 +285,7 @@ automaton_unpickle(
 		dump = (TrieNode*)(ptr);
 		TrieNode* node = (TrieNode*)memalloc(sizeof(TrieNode));
 		if (LIKELY(node != NULL)) {
-			node->output	= dump->output;
+			node->value		= dump->value;
 			node->fail		= dump->fail;
 			node->letter	= dump->letter;
 			node->n			= dump->n;
@@ -330,7 +326,7 @@ automaton_unpickle(
 			value = PyList_GetItem(values, object_idx++);
 			if (value) {
 				Py_INCREF(value);
-				node->output.object = value;
+				node->value = value;
 			}
 			else
 				goto exception;

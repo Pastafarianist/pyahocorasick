@@ -198,52 +198,21 @@ automaton_items_iter_next(PyObject* self) {
 #endif
 
 				case ITER_VALUES:
-					switch (iter->automaton->store) {
-						case STORE_ANY:
-							val = iter->state->output.object;
-							Py_INCREF(val);
-							break;
-
-						case STORE_LENGTH:
-						case STORE_INTS:
-							return Py_BuildValue("i", iter->state->output.integer);
-
-						default:
-							PyErr_SetString(PyExc_SystemError, "wrong attribute 'store'");
-							return NULL;
-					}
+					val = iter->state->value;
+					Py_INCREF(val);
 
 					return val;
 
 				case ITER_ITEMS:
-					switch (iter->automaton->store) {
-						case STORE_ANY:
-							return Py_BuildValue(
+					return Py_BuildValue(
 #ifdef AHOCORASICK_UNICODE
-								"(u#O)",
+						"(u#O)",
 #else
-								"(y#O)",
+						"(y#O)",
 #endif
-								/*key*/ iter->buffer + 1, item->depth,
-								/*val*/ iter->state->output.object
-							);
-
-						case STORE_LENGTH:
-						case STORE_INTS:
-							return Py_BuildValue(
-#ifdef AHOCORASICK_UNICODE
-								"(u#i)",
-#else
-								"(y#i)",
-#endif
-								/*key*/ iter->buffer + 1, item->depth,
-								/*val*/ iter->state->output.integer
-							);
-						
-						default:
-							PyErr_SetString(PyExc_SystemError, "wrong attribute 'store'");
-							return NULL;
-					} // switch
+						/*key*/ iter->buffer + 1, item->depth,
+						/*val*/ iter->state->value
+					);
 			}
 		}
 	}

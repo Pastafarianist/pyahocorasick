@@ -539,7 +539,7 @@ class TestAutomatonIterInvalidate(TestAutomatonBase):
 			w = next(it)
 
 
-print_dumps = False
+print_dumps = not True
 
 class TestPickle(TestAutomatonBase):
 	"Test pickling/unpickling"
@@ -567,101 +567,6 @@ class TestPickle(TestAutomatonBase):
 		AL = set(key for key in A.keys())
 		BL = set(key for key in B.keys())
 		self.assertEqual(AL, BL)
-
-
-class TestTrieStoreInts(unittest.TestCase):
-	"Test storing plain ints as values (instead of python objects)"
-
-	def setUp(self):
-		self.A = ahocorasick.Automaton(ahocorasick.STORE_INTS);
-		self.words = "word python aho corasick \x00\x00\x00".split()
-
-
-	def test_add_word1(self):
-		A = self.A
-
-		# by default next values are stored
-		for word in self.words:
-			A.add_word(conv(word))
-
-		I = list(range(1, len(self.words) + 1))
-		L = [A.get(conv(word)) for word in self.words]
-		self.assertEqual(I, L)
-
-
-	def test_add_word2(self):
-		A = self.A
-
-		# store arbitrary ints
-		for i, word in enumerate(self.words):
-			A.add_word(conv(word), i + 123)
-
-		I = list(range(123, 123 + len(self.words)))
-		L = [A.get(conv(word)) for word in self.words]
-		self.assertEqual(I, L)
-
-
-	def test_add_word3(self):
-		# not a number
-		with self.assertRaises(TypeError):
-			self.A.add_word(conv("xyz"), None)
-
-	
-	def test_iter(self):
-		A = self.A
-		for word in self.words:
-			A.add_word(conv(word));
-
-		I = set(range(1, len(A) + 1))
-		L1 = [val for val in A.values()]
-		L2 = [val for key, val in A.items()]
-
-		self.assertEqual(L1, L2)
-		self.assertEqual(set(L1), I)
-
-
-	def test_find_all_and_iter(self):
-		words  = "he her hers she".split()
-		string = "_sherhershe_"
-
-		A = self.A
-		for word in words:
-			A.add_word(conv(word))
-
-		A.make_automaton()
-
-		# find_all()
-		C = []
-		def callback(index, value):
-			C.append((index, value))
-		
-		A.find_all(conv(string), callback);
-
-		# iter()
-		L = [(index, value) for index, value in A.iter(conv(string))]
-
-		#
-		self.assertEqual(C, L)
-
-
-class TestTrieStoreLengths(unittest.TestCase):
-	"""Test storing plain ints -- length of words --- as values
-	(instead of python objects)"""
-
-	def setUp(self):
-		self.A = ahocorasick.Automaton(ahocorasick.STORE_LENGTH);
-		self.words = "word python aho corasick \x00\x00\x00".split()
-
-
-	def test_add_word1(self):
-		A = self.A
-
-		# by default next values are stored
-		for word in self.words:
-			A.add_word(conv(word))
-
-		for key, value in A.items():
-			self.assertEqual(len(key), value)
 
 
 class TestBugAutomatonSearch(TestAutomatonBase):

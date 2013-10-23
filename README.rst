@@ -98,7 +98,6 @@ Constants
 ~~~~~~~~~
 
 * ``unicode`` --- see `Unicode and bytes`_
-* ``STORE_ANY``, ``STORE_INTS``, ``STORE_LENGTH`` --- see Constructor_
 * ``EMPTY``, ``TRIE``, ``AHOCORASICK`` --- see Members_
 * ``MATCH_EXACT_LENGTH``, ``MATCH_AT_MOST_PREFIX``, ``MATCH_AT_LEAST_PREFIX``
   --- see description of method keys_
@@ -134,29 +133,6 @@ Members
 	``EMPTY`` or isn't an ``AHOCORASICK``. When called then
 	exception is raised, however testing this property could
 	be better (faster, more elegant).
-
-``store`` [readonly]
-	Type of values stored in trie. By default ``STORE_ANY``
-	is used, thus any python object could be used. When ``STORE_INTS``
-	or ``STORE_LENGTH`` is used then values are 32-bit integers
-	and do not occupy additional memory. See ``add_word`` description
-	for details.
-
-
-Constructor
-###########
-
-Constructor accepts just one argument, a type of values,
-one of constants:
-
-``STORE_ANY``
-	Any Python object (default).
-
-``STORE_LENGTH``
-	Length of string.
-
-``STORE_INTS``
-	32-bit integers.
 
 
 Dictionary methods
@@ -211,18 +187,9 @@ Dictionary methods
 Trie
 ####
 
-``add_word(word, [value]) => bool``
+``add_word(word, value) => bool``
 	Add new ``word``, a key, to dictionary and associate with ``value``.
 	Returns True if ``word`` didn't exists earlier in dictionary.
-
-	If ``store == STORE_LENGTH`` then ``value`` is not allowed ---
-	``len(word)`` is saved.
-
-	If ``store == STORE_INTS`` then ``value`` is optional. If present,
-	then have to be an integer, otherwise defaults to ``len(automaton)``.
-
-	If ``store == STORE_ANY`` then ``value`` is required and could
-	be any object.
 
 	**This method invalidates all iterators only if new word was
 	added (i.e. method returned True).**

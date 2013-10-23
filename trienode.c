@@ -17,8 +17,8 @@ static TrieNode*
 trienode_new(const TRIE_LETTER_TYPE letter, char eow) {
 	TrieNode* node = (TrieNode*)memalloc(sizeof(TrieNode));
 	if (node) {
-		node->output.integer = 0;
-		node->fail		= NULL;
+		node->value	= NULL;
+		node->fail	= NULL;
 
 		node->n		= 0;
 		node->letter	= letter;

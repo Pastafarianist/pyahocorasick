@@ -84,20 +84,9 @@ automaton_build_output(PyObject* self, PyObject** result) {
 	if (iter->output) {
 		node = iter->output;
 		iter->output = iter->output->fail;
-		switch (iter->automaton->store) {
-			case STORE_LENGTH:
-			case STORE_INTS:
-				*result = Py_BuildValue("ii", iter->index + iter->shift, node->output.integer);
-				return OutputValue;
 
-			case STORE_ANY:
-				*result = Py_BuildValue("iO", iter->index + iter->shift, node->output.object);
-				return OutputValue;
-
-			default:
-				PyErr_SetString(PyExc_ValueError, "inconsistent internal state!");
-				return OutputError;
-		}
+		*result = Py_BuildValue("iO", iter->index + iter->shift, node->value);
+		return OutputValue;
 	}
 
 	return OutputNone;
