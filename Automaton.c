@@ -51,7 +51,7 @@ automaton_new(PyTypeObject* self, PyObject* args, PyObject* kwargs) {
 	automaton->kind  = EMPTY;
 	automaton->root  = NULL;
 
-	if (UNLIKELY(PyTuple_Size(args) == 7)) {
+	if (UNLIKELY(PyTuple_Size(args) == 6)) {
 
 		// unpickle: count, data, kind, version, values
 		size_t			count;
